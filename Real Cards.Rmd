@@ -1,0 +1,437 @@
+---
+title: "Real Cards"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+```{r}
+CARDS <- paste(
+  rep(c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),rep(4, 13)),
+  rep(c(1, 2, 3, 4), 13),
+  sep = "_")
+```
+
+```{r}
+# takes matrix of hand values and returns best hand
+best.hand <- function(hand.values) {
+  top.index <- as.vector(which(hand.values[1,]==max(hand.values[1,])))
+  top.hands <- hand.values[,top.index]
+  n.top.hands <- length(top.hands)/6
+  if (n.top.hands == 1) {
+    for (i in 1:n.players) {
+      if (all(top.hands==hand.values[,i]))
+      break
+    }
+    return(top.hands)
+  }
+  for (i in 2:6) {
+    high.index <- as.vector(which(top.hands[i,]==max(top.hands[i,])))
+    top.hands <- top.hands[,high.index]
+    if (length(high.index) == 1) {
+      break
+    }
+  }
+  return(top.hands)
+}
+
+get.values <- function(all.cards) {
+  split <- strsplit(all.cards, "_")
+  values <- as.numeric(unlist(lapply(split, `[[`, 1)))
+  return(values)
+}
+
+get.suits <- function(all.cards) {
+  split <- strsplit(all.cards, "_")
+  suits <- as.numeric(unlist(lapply(split, `[[`, 2)))
+  return(suits)
+}
+
+  #High card
+is.highcard <- function(all.cards) {
+  high.card <- FALSE
+  values <- get.values(all.cards)
+  value.count <- table(values)
+  if (sum(value.count>=2)<1 && !is.straight(all.cards) && !is.flush(all.cards)) {
+    high.card <- TRUE
+  }
+  return(high.card)
+}
+
+  #Pair
+is.1pair <- function(all.cards) {
+  one.pair <- FALSE
+  values <- get.values(all.cards)
+  value.count <- table(values)
+  if (sum(value.count==2)==1 && sum(value.count>=3)==0 && !is.straight(all.cards) && !is.flush(all.cards)) {
+    one.pair <- TRUE
+  }
+  return(one.pair)
+}
+
+  #Two pair
+is.2pair <- function(all.cards) {
+  two.pair <- FALSE
+  values <- get.values(all.cards)
+  value.count <- table(values)
+  if (sum(value.count==2)>=2 && sum(value.count>=3)==0 && !is.straight(all.cards) && !is.flush(all.cards)) {
+    two.pair <- TRUE
+  }
+  return(two.pair)
+} 
+
+  #Three of a kind
+is.3ofkind <- function(all.cards) {
+  three.of.kind <- FALSE
+  values <- get.values(all.cards)
+  value.count <- table(values)
+  if (sum(value.count==3)==1 && sum(value.count==2)==0 && !is.straight(all.cards) && !is.flush(all.cards)) {
+    three.of.kind <- TRUE
+  }
+  return(three.of.kind)
+} 
+
+  #Straight
+is.straight <- function(all.cards) {
+  straight <- FALSE
+  values <- get.values(all.cards)
+  ranked.values <- unique(sort(values))
+  if (length(ranked.values) < 5) {
+    return(straight)
+  }
+  in.a.row <- 1
+  if (all(c(14,2,3,4,5) %in% values)) {
+    straight <- TRUE
+    return(straight)
+  }
+  for (i in 1:6) {
+    first <- ranked.values[i]+1
+    second <- ranked.values[i+1]
+      if (first != second) {
+        return(straight)
+      } else {
+      in.a.row <- in.a.row + 1
+      }
+    if (in.a.row == 5 && !is.flush(all.cards)) {
+        straight <- TRUE
+        return(straight)
+      }
+    }
+  }
+
+  #Flush
+is.flush <- function(all.cards) {
+  flush <- FALSE
+  suits <- get.suits(all.cards)
+  suit.count <- table(suits)
+  if (sum(suit.count>=5) == 1 && !is.straight(all.cards)) {
+    flush <- TRUE
+  }
+  return(flush)
+}
+
+  #Full house
+is.fullhouse <- function(all.cards) {
+  full.house <- FALSE
+  values <- get.values(all.cards)
+  value.count <- table(values)
+  if (sum(value.count==3)>= 1 && sum(value.count>=2)>=1) {
+   full.house <- TRUE
+  }
+  return(full.house)
+} 
+  
+  #Four of a kind
+is.4ofkind <- function(all.cards) {
+  four.of.kind <- FALSE
+  values <- get.values(all.cards)
+  value.count <- table(values)
+  if (sum(value.count==4)== 1) {
+    four.of.kind <- TRUE
+  }
+  return(four.of.kind)
+} 
+
+  #Straight flush
+is.straightflush <- function(all.cards) {
+  straight.flush <- FALSE
+  if (is.flush(all.cards)) {
+  suits <- get.suits(all.cards)
+  suit.count <- table(suits)
+  whichflush <- which(suit.count>=5)
+  flushindex <- which(suits==whichflush)
+  if (is.straight(all.cards[flushindex])) {
+    straight.flush <- TRUE
+  }
+  }
+  return(straight.flush)
+}
+
+```
+
+```{r}
+what.hand <- function(cards){
+  all.cards <- c(cards, com.cards)
+  
+  if (is.highcard(all.cards)) {
+    values <- get.values(all.cards)
+    highcard <- sort(values, TRUE)
+    return(c(1, highcard[1:5]))
+  }
+  
+  if (is.1pair(all.cards)) {
+    values <- get.values(all.cards)
+    pair.value <- values[which(duplicated(values))]
+    leftover <- values[!values %in% pair.value]
+    kicker <- sort(leftover, TRUE)
+    return(c(2, rep(pair.value, 2), kicker[1:3]))
+  }
+  
+  if (is.2pair(all.cards)) {
+    values <- get.values(all.cards)
+    pair.values <- sort(values[which(duplicated(values))], TRUE)[1:2]
+    leftover <- values[!values %in% pair.values]
+    kicker <- sort(leftover, TRUE)
+    return(c(3, sort(rep(pair.values, 2), TRUE), kicker[1]))
+  }
+    
+  if (is.3ofkind(all.cards)) {
+    values <- get.values(all.cards)
+    set.value <- (values[which(duplicated(values))])[1]
+    leftover <- values[!values %in% set.value]
+    kicker <- sort(leftover, TRUE)
+    return(c(4, rep(set.value, 3), kicker[1:2]))
+  }
+  
+  if (is.straight(all.cards)) {
+    values <- sort(unique(get.values(all.cards)), TRUE)
+    for(x in 1:3) {
+    if (all(c(14,2,3,4,5) %in% values) && !6 %in% values) {
+      top <- 5
+      break
+    }
+    if (sum(values[x:(x+4)])/5 == values[x+2]) {
+      top <- values[x]
+      break
+    }    
+    } 
+    return(c(5, top, top-1, top-2, top-3, top-4))
+  }
+  
+  if (is.flush(all.cards)) {
+    suits <- get.suits(all.cards)
+    u.suits <- unique(suits)
+    whichflush <- u.suits[which.max(tabulate(match(suits, u.suits)))]
+    flushindex <- which(suits==whichflush)
+    the.flush <- sort(get.values(all.cards)[flushindex], TRUE)[1:5]
+    return(c(6, the.flush))
+  }
+  
+  if (is.fullhouse(all.cards)) {
+    values <- get.values(all.cards)
+    boat <- (values[which(duplicated(values))])
+    set <- which.max(tabulate(boat))
+    pair <- sort(boat[!boat %in% set], TRUE)[1]
+    return(c(7, rep(set, 3), rep(pair, 2)))
+  }
+  
+  if (is.4ofkind(all.cards)) {
+    values <- get.values(all.cards)
+    four.value <- which.max(tabulate(values[which(duplicated(values))]))
+    leftover <- values[!values %in% four.value]
+    kicker <- sort(leftover, TRUE)
+    return(c(8, rep(four.value, 4), kicker[1]))
+  }
+  
+  if (is.straightflush(all.cards)) {
+    return(c(9, 0, 0, 0, 0, 0))
+  }
+}
+```
+
+```{r}
+cards <- sample(CARDS, 2)
+cards
+```
+
+```{r}
+pflop.odds <- function(cards, n.players){
+  n.sim <- 10^3
+  n.opps <- n.players - 1
+  win.count <- 0
+  CARDS.LEFT <- CARDS[!CARDS %in% cards]
+for (i in 1:n.sim) {
+  deck <- sample(CARDS.LEFT, size=50, replace=F)
+  hands <- matrix(deck[1:(2*n.opps)], n.opps, 2)
+  hands <- rbind(hands, cards)
+  com.cards <- c(deck[(2*n.opps+2):(2*n.opps+4)], deck[(2*n.opps+6)], deck[(2*n.opps+8)])
+  hand.values <- (apply(hands, 1, what.hand))
+  win.hand <- best.hand(hand.values)
+  if (all(win.hand == hand.values[,"cards"])) {
+    win.count <- win.count + 1
+  }
+}
+   win.count/n.sim
+}
+```
+
+```{r}
+##WHAT KIND OF HAND WINS 
+n.sim <- 10^3
+n.players <- 6
+win.hand.type <- 0
+winvalue <- matrix(NA, n.sim, 1)
+
+for (i in 1:n.sim) {
+  deck <- sample(CARDS, size=52, replace=F)
+  hands <- matrix(deck[1:(2*n.players)], n.players, 2)
+  com.cards <- c(deck[(2*n.players+2):(2*n.players+4)], deck[(2*n.players+6)], deck[(2*n.players+8)])
+  hand.values <- (apply(hands, 1, what.hand))
+  hand.values
+  win.hand <- best.hand(hand.values)
+  win.hand.type <- win.hand.type + win.hand[1]
+  winvalue[i] <- win.hand[1]
+}
+i
+win.hand.type/i
+```
+
+```{r}
+  ##WHAT KIND OF HAND WINS SHORT DECK
+diffcards <- 9
+CARDS <- paste(
+  rep(c(6, 7, 8, 9, 10, 11, 12, 13, 14),rep(4, diffcards)),
+  rep(c(1, 2, 3, 4), diffcards),
+  sep = "_")
+  
+n.sim <- 10^4
+n.players <- 6
+win.hand.type <- 0
+
+
+for (i in 1:n.sim) {
+  deck <- sample(CARDS, size=4*diffcards, replace=F)
+  hands <- matrix(deck[1:(2*n.players)], n.players, 2)
+  com.cards <- c(deck[(2*n.players+2):(2*n.players+4)], deck[(2*n.players+6)], deck[(2*n.players+8)])
+  hand.values <- (apply(hands, 1, what.hand))
+  hand.values
+  win.hand <- best.hand(hand.values)
+  win.hand.type <- win.hand.type + win.hand[1]
+  shortdeck <- rbind(shortdeck, win.hand[1])
+}
+i
+win.hand.type/i
+length(shortdeck)
+```
+
+```{r}
+deck <- shortdeck
+hand.prop <- matrix(0, 1, 9)
+for (i in 1:9) {
+  hand.prop[,i] <- length(which(deck==i))/length(deck)
+}
+colnames(hand.prop) <- seq(1,9)
+length(deck)
+hand.prop[,order(hand.prop, decreasing = T),drop=F]
+```
+```{r}
+prop.shortdeck <- rbind(prop.shortdeck,c(n.players,hand.prop))
+```
+
+```{r}
+# 2-7  Lowball
+finalhand.27 <- NULL
+for (i in 1:1000) {
+  CARDS <- paste(
+  rep(c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),rep(4, 13)),
+  rep(c(1, 2, 3, 4), 13),
+  sep = "_")
+  my.hand <- sample(CARDS, 5)
+  vals <- get.values(my.hand)
+  for (i in 1:3) {
+    CARDS <- CARDS[-which(CARDS %in% my.hand)]
+    if(any(duplicated(vals))){
+      my.hand <- my.hand[-which(duplicated(vals))]
+    }
+    if(any(vals>7)){
+      my.hand <- my.hand[-which(vals>7)]
+    }
+    #if(is.flush(my.hand)){
+    #  my.hand <- my.hand[-which.max(vals)]
+    #}
+    #if(is.straight(my.hand)){
+    #  ranked <- sort(vals, T)
+    #  my.hand <- which(vals == ranked[2])
+    #}
+      new.cards <- sample(CARDS, 5 - length(my.hand))
+      my.hand <- c(my.hand, new.cards)
+  }
+  final <- matrix(what.hand(my.hand),1,6)
+  finalhand.27 <- rbind(finalhand.27, final)
+}
+colnames(finalhand.27) <- c("Value", "Top", "2nd", "3rd", "4th", "5th")
+table(finalhand.27[,1])/1000
+```
+
+```{r}
+#HIGH OR LOW
+CARDS <- paste(
+  rep(c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),rep(4, 13)),
+  rep(c(1, 2, 3, 4), 13),
+  sep = "_")
+added <- 0
+max <- 1
+max.count <- 1
+n.sim <- 10000
+cardfile <- NULL
+tm <- proc.time()
+for(i in 1:n.sim){
+if(i %% 500 == 0){print(i)}
+deck <- sample(CARDS)
+wrong <- 0
+card <- 1
+for(i in 1:51){
+  card <- card + 1
+  vprop <- 1 - (get.values(deck[i]) - 2)/12
+  num <- runif(1)
+  if(0.5 < vprop || (0.5 == vprop && 0.5 <= num)){
+  #if(num >= 0.5){
+    higher <- TRUE
+  } else {higher <- FALSE}
+  if(higher){
+    if(get.values(deck[i+1]) > get.values(deck[i]) 
+       || get.values(deck[i+1]) == get.values(deck[i])){
+      next
+    } else {wrong <- wrong + 1}
+  } else {
+     if(get.values(deck[i+1]) < get.values(deck[i]) 
+       || get.values(deck[i+1]) == get.values(deck[i])){
+      next
+    } else {wrong <- wrong + 1}
+  }
+  if(wrong == 1){
+    break
+  } 
+}
+if(card > max){
+  max <- card
+  max.count <- 1
+} else if(card == max){
+  max.count <- max.count + 1
+}
+cardfile <- rbind(cardfile, card)
+added <- added + card
+}
+props <- c(rep(0,3), table(cardfile)/n.sim)
+proc.time() - tm
+added/n.sim
+sd(cardfile)
+max
+max.count
+```
